@@ -1036,7 +1036,7 @@ class StableDiffusionPipeline(
             ).to(device=device, dtype=latents.dtype)
 
         # 7. Denoising loop
-        denoise_start = time.tim()
+        denoise_start = time.time()
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         self._num_timesteps = len(timesteps)
         with self.progress_bar(total=num_inference_steps) as progress_bar:
@@ -1091,7 +1091,7 @@ class StableDiffusionPipeline(
                 if XLA_AVAILABLE:
                     xm.mark_step()
 
-        denoise_ended = time.tim()
+        denoise_ended = time.time()
         print(f"denoise cost {denoise_ended - denoise_start}")
         if not output_type == "latent":
             image = self.vae.decode(latents / self.vae.config.scaling_factor, return_dict=False, generator=generator)[
