@@ -1041,6 +1041,7 @@ class StableDiffusionPipeline(
         self._num_timesteps = len(timesteps)
         with self.progress_bar(total=num_inference_steps) as progress_bar:
             for i, t in enumerate(timesteps):
+                print(f"denoising ts: {t}")
                 if self.interrupt:
                     continue
 
@@ -1049,6 +1050,7 @@ class StableDiffusionPipeline(
                 latent_model_input = self.scheduler.scale_model_input(latent_model_input, t)
 
                 # predict the noise residual
+                noise_pred_start = time.time()
                 noise_pred = self.unet(
                     latent_model_input,
                     t,
@@ -1058,6 +1060,8 @@ class StableDiffusionPipeline(
                     added_cond_kwargs=added_cond_kwargs,
                     return_dict=False,
                 )[0]
+                noise_pred_stop = time.time()
+                print(f"noise predict cost {noise_pred_stop - noise_pred_start}")
 
                 # perform guidance
                 if self.do_classifier_free_guidance:
