@@ -14,6 +14,7 @@
 import inspect
 from typing import Any, Callable, Dict, List, Optional, Union
 
+import time
 import torch
 from packaging import version
 from transformers import CLIPImageProcessor, CLIPTextModel, CLIPTokenizer, CLIPVisionModelWithProjection
@@ -892,6 +893,7 @@ class StableDiffusionPipeline(
                 "not-safe-for-work" (nsfw) content.
         """
 
+        print(f"StableDiffusionPipeline is called")
         callback = kwargs.pop("callback", None)
         callback_steps = kwargs.pop("callback_steps", None)
 
@@ -961,6 +963,7 @@ class StableDiffusionPipeline(
             self.cross_attention_kwargs.get("scale", None) if self.cross_attention_kwargs is not None else None
         )
 
+        prompt_embed_begin = time.time()
         prompt_embeds, negative_prompt_embeds = self.encode_prompt(
             prompt,
             device,
@@ -972,6 +975,8 @@ class StableDiffusionPipeline(
             lora_scale=lora_scale,
             clip_skip=self.clip_skip,
         )
+        prompt_embed_ended = time.time()
+        print(f"prompt_embedding costs: {prompt_embed_ended - prompt_embed_begin}")
 
         # For classifier free guidance, we need to do two forward passes.
         # Here we concatenate the unconditional and text embeddings into a single batch
@@ -989,11 +994,15 @@ class StableDiffusionPipeline(
             )
 
         # 4. Prepare timesteps
+        timestamp_begin = time.time()
         timesteps, num_inference_steps = retrieve_timesteps(
             self.scheduler, num_inference_steps, device, timesteps, sigmas
         )
+        timestamp_ended = time.time()
+        print(f"timestamp costs: {timestamp_ended- timestamp_begin}")
 
         # 5. Prepare latent variables
+        latent_begin = time.time()
         num_channels_latents = self.unet.config.in_channels
         latents = self.prepare_latents(
             batch_size * num_images_per_prompt,
@@ -1005,6 +1014,8 @@ class StableDiffusionPipeline(
             generator,
             latents,
         )
+        latent_ended = time.time()
+        print(f"latent costs: {latent_ended - latent_begin}")
 
         # 6. Prepare extra step kwargs. TODO: Logic should ideally just be moved out of the pipeline
         extra_step_kwargs = self.prepare_extra_step_kwargs(generator, eta)
@@ -1025,6 +1036,7 @@ class StableDiffusionPipeline(
             ).to(device=device, dtype=latents.dtype)
 
         # 7. Denoising loop
+        denoise_start = time.tim()
         num_warmup_steps = len(timesteps) - num_inference_steps * self.scheduler.order
         self._num_timesteps = len(timesteps)
         with self.progress_bar(total=num_inference_steps) as progress_bar:
@@ -1079,6 +1091,8 @@ class StableDiffusionPipeline(
                 if XLA_AVAILABLE:
                     xm.mark_step()
 
+        denoise_ended = time.tim()
+        print(f"denoise cost {denoise_ended - denoise_start}")
         if not output_type == "latent":
             image = self.vae.decode(latents / self.vae.config.scaling_factor, return_dict=False, generator=generator)[
                 0
